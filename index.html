@@ -299,6 +299,20 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
         </div>
 
         <div class="field">
+          <div class="field-head">
+            <label for="prod" data-i18n-html="lProd">Assembler Productivity<span class="hint">Bonus on the crafted item</span></label>
+            <div class="readout"><input type="number" id="prod" inputmode="numeric" min="0" max="300" step="1" data-i18n-aria="ariaProd" aria-label="Assembler productivity bonus in percent"><span class="unit">%</span></div>
+          </div>
+          <div class="chips" role="group" data-i18n-aria="ariaProdChips" aria-label="Productivity presets" id="prodChips">
+            <button type="button" class="chip" data-v="0">0%</button>
+            <button type="button" class="chip" data-v="40">+40%</button>
+            <button type="button" class="chip" data-v="50">+50%</button>
+            <button type="button" class="chip" data-v="100">+100%</button>
+          </div>
+          <p class="mode-note" id="retNote"></p>
+        </div>
+
+        <div class="field">
           <div class="field-head"><span class="label" data-i18n="lMode">Loop strategy</span></div>
           <div class="seg" role="group" data-i18n-aria="ariaMode" aria-label="Loop strategy">
             <button type="button" data-mode="climb" aria-pressed="true" data-i18n="mClimb">Climb all tiers</button>
@@ -355,14 +369,17 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
   'use strict';
 
   /* =============== 1. MODELO (puro, sin DOM) ===============
-     - Cada ítem reciclado devuelve el 25 % de sus ingredientes (1 ítem → 0.25 ítems-equivalentes).
+     - Cada ítem reciclado devuelve el 25 % de sus ingredientes; si el ítem se fabricó en un ensamblador
+       con productividad, el retorno efectivo por bucle es 0.25 × (1 + productividad / 100) (máx. 1.0 con +300 %).
      - Cada ingrediente devuelto tira calidad: sube 1 tier con prob. q; tras subir hay un 10 % de
        subir otro tier más (encadenado). Legendary es el tope.
      - El ingrediente se vuelve a fabricar con su calidad (la fabricación se modela neutra).
      - Legendary no se recicla (es el producto final).
      Todo se resuelve en forma cerrada: la matriz de transición es triangular superior, así que
      la suma infinita de bucles es una serie geométrica 1 / (1 - M[k][k]). Sin simulación.        */
-  const RETURN = 0.25, SKIP = 0.10, TOP = 4;
+  const BASE_RETURN = 0.25, SKIP = 0.10, TOP = 4;
+  /** Retorno efectivo por bucle: 0.25 × (1 + productividad del ensamblador / 100). */
+  const returnFor = (prod) => BASE_RETURN * (1 + prod / 100);
 
   function dist(q, from) {                       // prob. de acabar en cada tier tras la tirada
     const d = [0, 0, 0, 0, 0], m = TOP - from;
@@ -372,10 +389,12 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
     return d;
   }
 
-  function compute(N, q, mode) {
+  function compute(N, q, mode, ret) {
     const M = [];
-    for (let i = 0; i < TOP; i++) M.push(dist(q, i).map((p) => RETURN * p));
+    for (let i = 0; i < TOP; i++) M.push(dist(q, i).map((p) => ret * p));
     const v = [0, 0, 0, 0, 0], a = [N, 0, 0, 0, 0];
+    // Sin probabilidad de calidad nada sube de tier; con retorno 100 % el bucle de Normal no termina nunca.
+    if (q <= 0) return { a, processed: ret < 1 ? N / (1 - ret) : Infinity };
     if (mode === 'normal') {                     // solo se recicla Normal; lo mejorado se retira
       v[0] = N / (1 - M[0][0]);
       for (let k = 1; k <= TOP; k++) a[k] = v[0] * M[0][k];
@@ -398,7 +417,10 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
       tIn: 'Input', tOut: 'Expected yield',
       lAmount: 'Starting items<span class="hint">Base (Normal) quality</span>',
       lChance: 'Quality chance<span class="hint">Per recycled ingredient</span>',
+      lProd: 'Assembler Productivity<span class="hint">Bonus on the crafted item</span>',
       ariaChance: 'Quality chance in percent, exact value', ariaAmt: 'Quick amounts', ariaPre: 'Module presets',
+      ariaProd: 'Assembler productivity bonus in percent', ariaProdChips: 'Productivity presets',
+      retNote: (r) => `Effective return per loop: ${r}% (25% × (1 + productivity))`,
       pre1: '4× Quality module 1 (1% each)', pre2: '4× Quality module 2 (2% each)',
       pre3: '4× Quality module 3 (2.5% each)', pre4: '4× legendary Quality module 3 (6.2% each)',
       lMode: 'Loop strategy', ariaMode: 'Loop strategy', mClimb: 'Climb all tiers', mNormal: 'Normal only',
@@ -408,7 +430,7 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
       per100: '1 for every', per100r: 'items', best: 'of start',
       sProc: 'Recycler loads (items processed)', sRatio: 'Recycler loads per starting item',
       dTitle: 'Exact values & assumptions', thTier: 'Tier', thExact: 'Exact yield', thPct: '% of start',
-      assump: '<ul><li>The recycler returns <code>25%</code> of the ingredients of each item.</li><li>Every returned ingredient rolls quality: upgrade chance <code>q</code>, and after an upgrade there is a <code>10%</code> chance of one more tier, chained. Legendary is the cap.</li><li>Returned ingredients are re-crafted into items of the same quality (the crafting step is treated as quality-neutral).</li><li>Results are <b>expected values</b> (averages), computed in closed form for infinite loops, not simulated.</li><li>Items that skip above a tier are real items of the higher tier; each card assumes you stop at its own tier.</li><li>Legendary items are never recycled.</li></ul>',
+      assump: '<ul><li>The recycler returns <code>25%</code> of the ingredients of each item. Assembler productivity raises it: effective return per loop = <code>25% × (1 + productivity)</code> = <code>{RET}%</code> right now.</li><li>Every returned ingredient rolls quality: upgrade chance <code>q</code>, and after an upgrade there is a <code>10%</code> chance of one more tier, chained. Legendary is the cap.</li><li>Returned ingredients are re-crafted into items of the same quality (the crafting step is treated as quality-neutral).</li><li>Results are <b>expected values</b> (averages), computed in closed form for infinite loops, not simulated.</li><li>Items that skip above a tier are real items of the higher tier; each card assumes you stop at its own tier.</li><li>Legendary items are never recycled.</li></ul>',
       kTitle: 'Fuel the factory', kText: 'Found this useful? Help me keep building free tools for engineers like you.', kBtn: 'Buy me a coffee',
       legal: 'Fan-made tool. Not affiliated with Wube Software. Factorio is a trademark of Wube Software Ltd.'
     },
@@ -418,7 +440,10 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
       tIn: 'Entrada', tOut: 'Rendimiento esperado',
       lAmount: 'Ítems iniciales<span class="hint">Calidad base (Normal)</span>',
       lChance: 'Probabilidad de calidad<span class="hint">Por ingrediente reciclado</span>',
+      lProd: 'Productividad de ensamblado<span class="hint">Bonus sobre el ítem fabricado</span>',
       ariaChance: 'Probabilidad de calidad en porcentaje, valor exacto', ariaAmt: 'Cantidades rápidas', ariaPre: 'Presets de módulos',
+      ariaProd: 'Bonus de productividad del ensamblador en porcentaje', ariaProdChips: 'Presets de productividad',
+      retNote: (r) => `Retorno efectivo por bucle: ${r} % (25 % × (1 + productividad))`,
       pre1: '4× módulo de calidad 1 (1 % cada uno)', pre2: '4× módulo de calidad 2 (2 % cada uno)',
       pre3: '4× módulo de calidad 3 (2,5 % cada uno)', pre4: '4× módulo de calidad 3 legendario (6,2 % cada uno)',
       lMode: 'Estrategia del bucle', ariaMode: 'Estrategia del bucle', mClimb: 'Subir todos los tiers', mNormal: 'Solo Normal',
@@ -428,7 +453,7 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
       per100: '1 por cada', per100r: 'ítems', best: 'del inicio',
       sProc: 'Cargas del reciclador (ítems procesados)', sRatio: 'Cargas del reciclador por ítem inicial',
       dTitle: 'Valores exactos y supuestos', thTier: 'Tier', thExact: 'Rendimiento exacto', thPct: '% del inicio',
-      assump: '<ul><li>El reciclador devuelve el <code>25 %</code> de los ingredientes de cada ítem.</li><li>Cada ingrediente devuelto tira calidad: probabilidad de mejora <code>q</code>, y tras mejorar hay un <code>10 %</code> de subir un tier más, encadenado. Legendario es el tope.</li><li>Los ingredientes devueltos se vuelven a fabricar en ítems de la misma calidad (el paso de fabricación se trata como neutro en calidad).</li><li>Los resultados son <b>valores esperados</b> (medias), calculados en forma cerrada para bucles infinitos, no simulados.</li><li>Los ítems que saltan por encima de un tier son ítems reales del tier superior; cada tarjeta asume que te detienes en su propio tier.</li><li>Los ítems Legendarios nunca se reciclan.</li></ul>',
+      assump: '<ul><li>El reciclador devuelve el <code>25 %</code> de los ingredientes de cada ítem. La productividad del ensamblador lo aumenta: retorno efectivo por bucle = <code>25 % × (1 + productividad)</code> = <code>{RET} %</code> ahora mismo.</li><li>Cada ingrediente devuelto tira calidad: probabilidad de mejora <code>q</code>, y tras mejorar hay un <code>10 %</code> de subir un tier más, encadenado. Legendario es el tope.</li><li>Los ingredientes devueltos se vuelven a fabricar en ítems de la misma calidad (el paso de fabricación se trata como neutro en calidad).</li><li>Los resultados son <b>valores esperados</b> (medias), calculados en forma cerrada para bucles infinitos, no simulados.</li><li>Los ítems que saltan por encima de un tier son ítems reales del tier superior; cada tarjeta asume que te detienes en su propio tier.</li><li>Los ítems Legendarios nunca se reciclan.</li></ul>',
       kTitle: 'Alimenta la fábrica', kText: '¿Te ha sido útil? Ayúdame a seguir creando herramientas gratuitas para ingenieros como tú.', kBtn: 'Invítame a un café',
       legal: 'Herramienta de fans. Sin afiliación con Wube Software. Factorio es una marca de Wube Software Ltd.'
     }
@@ -455,7 +480,7 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
   let lang = detectLang();
   const T = () => I18N[lang];
   const loc = () => (lang === 'es' ? 'es-ES' : 'en-US');
-  const state = { amount: 1000, chance: 24.8, mode: 'climb' };
+  const state = { amount: 1000, chance: 24.8, prod: 0, mode: 'climb' };
 
   /** Formato legible: más decimales cuando el valor es pequeño. */
   function fmt(x, forceDec) {
@@ -468,7 +493,7 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
 
   /* =============== 4. DOM =============== */
   const els = {
-    amount: $('amount'), chance: $('chance'), range: $('chanceRange'),
+    amount: $('amount'), chance: $('chance'), range: $('chanceRange'), prod: $('prod'), retNote: $('retNote'),
     tiers: $('tiers'), sProc: $('sProc'), sRatio: $('sRatio'), exact: $('exact'),
     assump: $('assump'), note: $('modeNote'), sr: $('srOut')
   };
@@ -505,7 +530,11 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
   let srTimer;
   function render() {
     const tx = T(), N = state.amount, q = state.chance / 100;
-    const r = compute(N, q, state.mode);
+    const ret = returnFor(state.prod);
+    const r = compute(N, q, state.mode, ret);
+    const retPct = (ret * 100).toLocaleString(loc(), { maximumFractionDigits: 2 });
+    els.retNote.textContent = tx.retNote(retPct);
+    els.assump.innerHTML = tx.assump.replace('{RET}', retPct);   // solo marcado fijo del diccionario + un número
 
     const maxA = Math.max(r.a[1], r.a[2], r.a[3], r.a[4], 1e-12);
     for (let k = 1; k <= TOP; k++) {
@@ -515,8 +544,8 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
       c.pc.textContent = fmt(per100, per100 >= 1 ? 2 : 4) + '%';
       c.bar.style.width = (r.a[k] > 0 ? Math.max(2, (r.a[k] / maxA) * 100) : 0) + '%';
     }
-    setNum(els.sProc, r.processed, (x) => fmt(x));
-    setNum(els.sRatio, r.processed / N, (x) => fmt(x, 3));
+    setNum(els.sProc, r.processed, (x) => (x === Infinity ? '∞' : fmt(x)));
+    setNum(els.sRatio, r.processed / N, (x) => (x === Infinity ? '∞' : fmt(x, 3)));
 
     // Tabla de valores exactos
     let rows = '';
@@ -549,7 +578,6 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
       el.querySelector('.p100r').textContent = tx.per100r;
       el.querySelector('.of').textContent = tx.best;
     });
-    els.assump.innerHTML = tx.assump;
     els.note.textContent = state.mode === 'climb' ? tx.noteClimb : tx.noteNormal;
     render();
   }
@@ -561,10 +589,12 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
   function sync(skip) {
     if (skip !== els.amount) els.amount.value = state.amount;
     if (skip !== els.chance) els.chance.value = state.chance;
+    if (skip !== els.prod) els.prod.value = state.prod;
     if (skip !== els.range) els.range.value = state.chance;
     paintRange();
     document.querySelectorAll('#amtChips .chip').forEach((c) => c.classList.toggle('on', +c.dataset.v === state.amount));
     document.querySelectorAll('#preChips .chip').forEach((c) => c.classList.toggle('on', +c.dataset.v === state.chance));
+    document.querySelectorAll('#prodChips .chip').forEach((c) => c.classList.toggle('on', +c.dataset.v === state.prod));
   }
 
   /* =============== 6. EVENTOS =============== */
@@ -576,6 +606,13 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
     state.chance = sanitize(raw, 0, 100, state.chance, 1);
     sync(commit ? null : src); render();
   }
+  function setProd(raw, src, commit) {
+    state.prod = Math.floor(sanitize(raw, 0, 300, state.prod, 0));
+    sync(commit ? null : src); render();
+  }
+  els.prod.addEventListener('input', () => setProd(els.prod.value, els.prod, false));
+  els.prod.addEventListener('change', () => setProd(els.prod.value, els.prod, true));
+  els.prod.addEventListener('blur', () => setProd(els.prod.value, els.prod, true));
   els.amount.addEventListener('input', () => setAmount(els.amount.value, els.amount, false));
   els.amount.addEventListener('change', () => setAmount(els.amount.value, els.amount, true));
   els.amount.addEventListener('blur', () => setAmount(els.amount.value, els.amount, true));
@@ -583,13 +620,14 @@ noscript p{margin:16px; text-align:center; color:var(--ink-2)}
   els.chance.addEventListener('change', () => setChance(els.chance.value, els.chance, true));
   els.chance.addEventListener('blur', () => setChance(els.chance.value, els.chance, true));
   els.range.addEventListener('input', () => setChance(els.range.value, els.range, false));
-  [els.amount, els.chance].forEach((el) => el.addEventListener('keydown', (e) => {
+  [els.amount, els.chance, els.prod].forEach((el) => el.addEventListener('keydown', (e) => {
     if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
-    if (el === els.amount && (e.key === '.' || e.key === ',')) e.preventDefault();
+    if (el !== els.chance && (e.key === '.' || e.key === ',')) e.preventDefault();
   }));
 
   document.querySelectorAll('#amtChips .chip').forEach((c) => c.addEventListener('click', () => setAmount(c.dataset.v, null, true)));
   document.querySelectorAll('#preChips .chip').forEach((c) => c.addEventListener('click', () => setChance(c.dataset.v, null, true)));
+  document.querySelectorAll('#prodChips .chip').forEach((c) => c.addEventListener('click', () => setProd(c.dataset.v, null, true)));
   document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
     state.mode = b.dataset.mode;
     document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
