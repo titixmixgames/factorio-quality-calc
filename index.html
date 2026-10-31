@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#151516">
+<meta name="color-scheme" content="dark">
+<title>Factorio Quality Loop Calculator – Space Age Recycler Yield</title>
+<meta name="description" content="Free Factorio: Space Age quality loop calculator. Enter your starting items and quality chance to get the exact expected Uncommon, Rare, Epic and Legendary yield from infinite recycler loops. Calculadora de bucle de calidad en español.">
+<meta name="keywords" content="Factorio quality calculator, Factorio Space Age, quality loop, recycler, legendary, calculadora Factorio calidad">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Factorio Quality Loop Calculator">
+<meta property="og:description" content="Exact expected Uncommon → Legendary yield from infinite recycler loops in Factorio: Space Age.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='9' fill='%23e08a1e'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23151516'/%3E%3Cg fill='%23e08a1e'%3E%3Crect x='14' y='2' width='4' height='6'/%3E%3Crect x='14' y='24' width='4' height='6'/%3E%3Crect x='2' y='14' width='6' height='4'/%3E%3Crect x='24' y='14' width='6' height='4'/%3E%3C/g%3E%3C/svg%3E">
+
+<style>
+/* ============================================================
+   TOKENS – dark industrial: gunmetal greys + rusty orange
+============================================================ */
+:root{
+  --bg:#121213; --plate:#1d1e20; --plate-hi:#26272a; --well:#0f0f10;
+  --steel:#3a3b3f; --steel-hi:#55565b;
+  --ink:#ece6da; --ink-2:#b9b2a5; --ink-3:#8a8478;
+  --rust:#d9791c; --rust-hi:#f0a23c; --rust-lo:#9a4a14;
+  --hazard:#e2a82a;
+  --q0:#c9c9c9; --q1:#6fd357; --q2:#4da6ff; --q3:#b86bff; --q4:#ff9f1c;
+  --f-head:'Bahnschrift','DIN Alternate','Arial Narrow','Roboto Condensed','Segoe UI',system-ui,sans-serif;
+  --f-body:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --f-num:ui-monospace,'Cascadia Mono','SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; min-height:100vh; min-height:100dvh; color:var(--ink);
+  font:400 16px/1.5 var(--f-body); -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
+  background:
+    radial-gradient(120% 60% at 50% -10%, #2b1a0c 0%, transparent 60%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,.012) 0 2px, transparent 2px 6px),
+    var(--bg);
+}
+h1,h2,h3{font-family:var(--f-head); margin:0; text-transform:uppercase; letter-spacing:.06em}
+button,input{font:inherit; color:inherit}
+
+/* ============================================================
+   LAYOUT
+============================================================ */
+.wrap{max-width:1000px; margin:0 auto; padding:14px 14px max(32px,env(safe-area-inset-bottom))}
+.cols{display:grid; gap:14px}
+@media(min-width:860px){ .cols{grid-template-columns:minmax(0,5fr) minmax(0,6fr); align-items:start} .wrap{padding-top:28px} }
+
+/* Placa metálica con remaches */
+.plate{
+  position:relative; background:linear-gradient(180deg,var(--plate-hi),var(--plate));
+  border:2px solid var(--steel); border-radius:4px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07), inset 0 0 40px rgba(0,0,0,.35), 0 10px 24px -10px rgba(0,0,0,.8);
+}
+.plate::before,.plate::after{ /* remaches */
+  content:""; position:absolute; top:7px; width:7px; height:7px; border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle at 35% 30%, #8a8b90, #34353a 70%); box-shadow:0 1px 0 rgba(0,0,0,.6);
+}
+.plate::before{left:7px} .plate::after{right:7px}
+.plate-title{
+  display:flex; align-items:center; gap:10px; margin:0; padding:12px 28px 10px;
+  font-size:15px; color:var(--rust-hi); border-bottom:2px solid var(--steel);
+  background:linear-gradient(180deg,rgba(0,0,0,.25),transparent);
+}
+.plate-title svg{width:18px;height:18px;flex:none}
+.plate-body{padding:16px}
+
+/* ============================================================
+   CABECERA
+============================================================ */
+header.top{position:relative; overflow:hidden; border:2px solid var(--steel); border-radius:4px; background:linear-gradient(180deg,#2a1b0e,#1a1410)}
+.top-in{display:flex; align-items:center; gap:14px; padding:16px 14px 16px 16px}
+.gears{position:relative; width:58px; height:58px; flex:none}
+.gears svg{position:absolute; color:var(--rust)}
+.g1{width:42px;height:42px;left:0;top:14px; animation:spin 14s linear infinite}
+.g2{width:30px;height:30px;right:0;top:0; color:var(--rust-lo)!important; animation:spin 14s linear infinite reverse}
+@keyframes spin{to{transform:rotate(360deg)}}
+.titles{flex:1 1 0; min-width:0}
+.eyebrow{display:block; white-space:nowrap; font:700 11px/1 var(--f-head); letter-spacing:.14em; text-transform:uppercase; color:var(--rust-hi)}
+h1{font-size:clamp(18px,5.1vw,34px); letter-spacing:.04em; line-height:1.08; margin-top:5px; color:var(--ink); text-shadow:0 2px 0 #000; overflow-wrap:break-word; hyphens:auto}
+.lang{margin-left:auto; align-self:flex-start; display:flex; border:2px solid var(--steel); border-radius:3px; overflow:hidden; background:var(--well); flex:none}
+.lang button{min-width:42px; height:36px; padding:0 8px; border:0; background:transparent; cursor:pointer; font:700 13px/1 var(--f-head); letter-spacing:.1em; color:var(--ink-3)}
+.lang button+button{border-left:2px solid var(--steel)}
+.lang button[aria-pressed="true"]{background:linear-gradient(180deg,var(--rust-hi),var(--rust)); color:#1a1004}
+.lang button:focus-visible{outline:2px dashed var(--rust-hi); outline-offset:-4px}
+h1{hyphens:manual}
+@media(max-width:520px){ /* móvil: el selector de idioma pasa a la esquina y el título usa todo el ancho */
+  .top-in{padding-top:56px; position:relative}
+  .lang{position:absolute; top:10px; right:10px}
+  .lang button{min-width:40px; height:34px}
+}
+.hazard{height:10px; background:repeating-linear-gradient(-45deg,var(--hazard) 0 12px,#17120a 12px 24px); border-top:2px solid #000; border-bottom:2px solid #000}
+.belt{height:12px; background:repeating-linear-gradient(90deg,#2d2d30 0 16px,#3d3d42 16px 19px,#232326 19px 22px); animation:belt 1.2s linear infinite; border-bottom:2px solid #000}
+@keyframes belt{to{background-position-x:22px}}
+
+/* ============================================================
+   CONTROLES
+============================================================ */
+.field{margin-bottom:18px}
+.field:last-child{margin-bottom:0}
+.field-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px}
+.field label,.label{font:700 15px/1.2 var(--f-head); text-transform:uppercase; letter-spacing:.07em; color:var(--ink)}
+.hint{display:block; font:400 13px/1.3 var(--f-body); text-transform:none; letter-spacing:0; color:var(--ink-3); margin-top:2px}
+.readout{display:flex; align-items:center; gap:6px; flex:none}
+.unit{font:700 14px var(--f-num); color:var(--rust-hi)}
+input[type=number]{
+  -moz-appearance:textfield; appearance:textfield; width:112px; height:46px; padding:0 8px; text-align:right;
+  font:700 22px/1 var(--f-num); color:var(--rust-hi); background:var(--well);
+  border:2px solid var(--steel); border-radius:3px; box-shadow:inset 0 3px 8px rgba(0,0,0,.7);
+  transition:border-color .2s, box-shadow .2s;
+}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]:focus{outline:none; border-color:var(--rust); box-shadow:inset 0 3px 8px rgba(0,0,0,.7), 0 0 0 3px rgba(217,121,28,.25)}
+#chance{width:96px}
+
+input[type=range]{--fill:50%; -webkit-appearance:none; appearance:none; display:block; width:100%; height:44px; margin:2px 0 0; background:transparent; cursor:pointer; touch-action:pan-y}
+input[type=range]:focus-visible{outline:2px dashed var(--rust-hi); outline-offset:2px}
+input[type=range]::-webkit-slider-runnable-track{height:10px; border-radius:2px; background:linear-gradient(90deg,transparent var(--fill),#0b0b0c var(--fill)),linear-gradient(90deg,var(--rust-lo),var(--rust-hi)); box-shadow:0 0 0 2px #000, inset 0 2px 3px rgba(0,0,0,.6)}
+input[type=range]::-moz-range-track{height:10px; border-radius:2px; background:linear-gradient(90deg,transparent var(--fill),#0b0b0c var(--fill)),linear-gradient(90deg,var(--rust-lo),var(--rust-hi)); box-shadow:0 0 0 2px #000, inset 0 2px 3px rgba(0,0,0,.6)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none; width:26px; height:30px; margin-top:-10px; border-radius:3px; background:linear-gradient(180deg,#8d8e93,#4a4b50 50%,#35363a); border:2px solid #0c0c0d; box-shadow:0 0 0 1px var(--rust), 0 3px 6px rgba(0,0,0,.7)}
+input[type=range]::-moz-range-thumb{width:22px; height:26px; border-radius:3px; background:linear-gradient(180deg,#8d8e93,#4a4b50 50%,#35363a); border:2px solid #0c0c0d; box-shadow:0 0 0 1px var(--rust), 0 3px 6px rgba(0,0,0,.7)}
+input[type=range]:active::-webkit-slider-thumb{box-shadow:0 0 0 1px var(--rust-hi), 0 0 0 7px rgba(240,162,60,.2)}
+.scale{display:flex; justify-content:space-between; font:400 12px var(--f-num); color:var(--ink-3); margin-top:-4px}
+
+.chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+.chip{
+  min-height:38px; padding:0 12px; cursor:pointer; font:700 13px/1 var(--f-num); color:var(--ink-2);
+  background:linear-gradient(180deg,#34353a,#232427); border:2px solid var(--steel); border-radius:3px;
+  transition:border-color .15s, color .15s, transform .1s;
+}
+.chip:hover{border-color:var(--rust); color:var(--ink)}
+.chip:active{transform:translateY(1px)}
+.chip:focus-visible{outline:2px dashed var(--rust-hi); outline-offset:2px}
+.chip.on{color:#1a1004; background:linear-gradient(180deg,var(--rust-hi),var(--rust)); border-color:var(--rust-hi)}
+
+.seg{display:grid; grid-template-columns:1fr 1fr; border:2px solid var(--steel); border-radius:3px; overflow:hidden; background:var(--well)}
+.seg button{min-height:48px; padding:6px 8px; border:0; background:transparent; cursor:pointer; font:700 13px/1.15 var(--f-head); text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3); transition:background .2s,color .2s}
+.seg button+button{border-left:2px solid var(--steel)}
+.seg button[aria-pressed="true"]{background:linear-gradient(180deg,var(--rust-hi),var(--rust)); color:#1a1004}
+.seg button:focus-visible{outline:2px dashed var(--rust-hi); outline-offset:-5px}
+.mode-note{margin:10px 0 0; font-size:13.5px; color:var(--ink-2); line-height:1.45}
+
+/* ============================================================
+   RESULTADOS
+============================================================ */
+.tiers{display:grid; gap:10px}
+.tier{
+  --c:var(--q1); position:relative; padding:12px 14px 12px 16px; background:var(--well);
+  border:2px solid var(--steel); border-left:6px solid var(--c); border-radius:3px; overflow:hidden;
+  box-shadow:inset 0 0 26px rgba(0,0,0,.5);
+}
+.tier[data-q="1"]{--c:var(--q1)} .tier[data-q="2"]{--c:var(--q2)} .tier[data-q="3"]{--c:var(--q3)} .tier[data-q="4"]{--c:var(--q4)}
+.tier.legend{border-color:var(--q4); box-shadow:inset 0 0 26px rgba(0,0,0,.5), 0 0 22px -6px rgba(255,159,28,.45)}
+.tier.legend::after{content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(105deg,transparent 40%,rgba(255,200,110,.13) 50%,transparent 60%); transform:translateX(-120%); animation:glint 5.5s ease-in-out 1.5s infinite}
+@keyframes glint{0%{transform:translateX(-120%)}35%,100%{transform:translateX(120%)}}
+.tier-row{display:flex; align-items:baseline; justify-content:space-between; gap:10px}
+.tier h3{display:flex; align-items:center; gap:8px; font-size:15px; color:var(--c)}
+.gem{width:12px; height:12px; flex:none; background:var(--c); transform:rotate(45deg); box-shadow:0 0 8px var(--c)}
+.big{font:700 clamp(26px,8vw,36px)/1 var(--f-num); color:var(--ink); text-shadow:0 2px 0 #000; font-variant-numeric:tabular-nums; text-align:right; word-break:break-all}
+.sub{display:flex; justify-content:space-between; gap:10px; margin-top:6px; font-size:13px; color:var(--ink-3)}
+.sub b{font-family:var(--f-num); font-weight:700; color:var(--ink-2)}
+.bar{height:8px; margin-top:8px; background:#050505; border:1px solid #000; border-radius:2px; overflow:hidden}
+.bar i{display:block; height:100%; width:0; background:linear-gradient(90deg,color-mix(in srgb,var(--c) 55%,#000),var(--c)); transition:width .6s var(--ease)}
+
+.stats{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:12px}
+.stat{padding:10px 12px; background:var(--well); border:2px solid var(--steel); border-radius:3px}
+.stat span{display:block; font-size:12.5px; color:var(--ink-3); line-height:1.25}
+.stat b{display:block; margin-top:4px; font:700 20px/1.1 var(--f-num); color:var(--rust-hi); font-variant-numeric:tabular-nums}
+
+details{margin-top:12px; border:2px solid var(--steel); border-radius:3px; background:var(--well)}
+summary{cursor:pointer; list-style:none; padding:12px 14px; font:700 14px/1.2 var(--f-head); text-transform:uppercase; letter-spacing:.07em; color:var(--rust-hi); display:flex; align-items:center; gap:8px; min-height:44px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸"; transition:transform .2s} details[open] summary::before{transform:rotate(90deg)}
+summary:focus-visible{outline:2px dashed var(--rust-hi); outline-offset:-4px}
+.detail-body{padding:2px 14px 14px; font-size:14px; color:var(--ink-2)}
+.detail-body ul{margin:8px 0 12px; padding-left:18px}
+.detail-body li{margin:4px 0}
+.detail-body code{font-family:var(--f-num); font-size:13px; color:var(--rust-hi); background:#000; padding:1px 5px; border-radius:2px}
+table{width:100%; border-collapse:collapse; font-family:var(--f-num); font-size:13px}
+th,td{padding:6px 8px; text-align:right; border-bottom:1px solid var(--steel)}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--ink-3); font-weight:700}
+
+/* ============================================================
+   KO-FI
+============================================================ */
+.support{margin-top:14px; text-align:center; overflow:hidden}
+.support .plate-body{padding:22px 16px 24px; background:radial-gradient(70% 120% at 50% 0%,rgba(217,121,28,.14),transparent 70%)}
+.cup{width:46px; height:46px; color:var(--rust-hi); margin-bottom:6px}
+.steam{animation:steam 2.4s ease-in-out infinite; transform-origin:center bottom}
+.steam:nth-child(2){animation-delay:-.8s} .steam:nth-child(3){animation-delay:-1.6s}
+@keyframes steam{0%,100%{opacity:.25; transform:translateY(1px)} 50%{opacity:1; transform:translateY(-2px)}}
+.support h2{font-size:18px; color:var(--ink)}
+.support p{max-width:42ch; margin:8px auto 16px; color:var(--ink-2); font-size:15px}
+.kofi{
+  position:relative; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; gap:10px;
+  min-height:52px; padding:0 26px; text-decoration:none; color:#1a1004;
+  font:700 16px/1 var(--f-head); text-transform:uppercase; letter-spacing:.1em;
+  background:linear-gradient(180deg,var(--rust-hi),var(--rust) 60%,#b9570f);
+  border:2px solid #ffc36b; border-radius:3px; box-shadow:0 4px 0 #6e3208, 0 10px 22px -6px rgba(0,0,0,.7);
+  transition:transform .12s, box-shadow .12s, filter .2s;
+}
+.kofi svg{width:22px;height:22px;flex:none}
+.kofi:hover{filter:brightness(1.1)}
+.kofi:active{transform:translateY(3px); box-shadow:0 1px 0 #6e3208, 0 4px 10px -4px rgba(0,0,0,.7)}
+.kofi:focus-visible{outline:2px dashed #fff; outline-offset:4px}
+.kofi::after{content:""; position:absolute; top:0; bottom:0; left:-70%; width:35%; transform:skewX(-20deg); background:linear-gradient(100deg,transparent,rgba(255,255,255,.55),transparent); animation:shine 6s ease-in-out 2s infinite; pointer-events:none}
+@keyframes shine{0%{left:-70%} 22%,100%{left:140%}}
+.legal{margin:18px 6px 0; text-align:center; font-size:12.5px; line-height:1.45; color:var(--ink-3)}
+
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+.tick{animation:tick .3s var(--ease)}
+@keyframes tick{from{opacity:.4; transform:translateY(4px)} to{opacity:1; transform:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important; transition:none!important}}
+noscript p{margin:16px; text-align:center; color:var(--ink-2)}
+</style>
+</head>
+
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="i-gear" viewBox="-14 -14 28 28">
+    <g fill="currentColor">
+      <circle r="9"/>
+      <rect x="-2.2" y="-13" width="4.4" height="5.5"/>
+      <rect x="-2.2" y="-13" width="4.4" height="5.5" transform="rotate(45)"/>
+      <rect x="-2.2" y="-13" width="4.4" height="5.5" transform="rotate(90)"/>
+      <rect x="-2.2" y="-13" width="4.4" height="5.5" transform="rotate(135)"/>
+      <rect x="-2.2" y="-13" width="4.4" height="5.5" transform="rotate(180)"/>
+      <rect x="-2.2" y="-13" width="4.4" height="5.5" transform="rotate(225)"/>
+      <rect x="-2.2" y="-13" width="4.4" height="5.5" transform="rotate(270)"/>
+      <rect x="-2.2" y="-13" width="4.4" height="5.5" transform="rotate(315)"/>
+    </g>
+    <circle r="3.6" fill="#1b1410"/>
+  </symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z" fill="currentColor"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="square"/></symbol>
+  <symbol id="i-cup" viewBox="0 0 24 24">
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 9h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M16 10.5h1.5a2.5 2.5 0 0 1 0 5H16"/>
+      <path class="steam" d="M7 3.5v2"/><path class="steam" d="M10 3v3"/><path class="steam" d="M13 3.5v2"/>
+    </g>
+  </symbol>
+</svg>
+
+<main class="wrap">
+  <header class="top">
+    <div class="top-in">
+      <div class="gears" aria-hidden="true">
+        <svg class="g1"><use href="#i-gear"/></svg>
+        <svg class="g2"><use href="#i-gear"/></svg>
+      </div>
+      <div class="titles">
+        <span class="eyebrow" data-i18n="eyebrow">Factorio: Space Age</span>
+        <h1 data-i18n="title">Quality Loop Calculator</h1>
+      </div>
+      <div class="lang" role="group" data-i18n-aria="ariaLang" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang="es" aria-pressed="false">ES</button>
+      </div>
+    </div>
+    <div class="hazard" aria-hidden="true"></div>
+    <div class="belt" aria-hidden="true"></div>
+  </header>
+
+  <div class="cols" style="margin-top:14px">
+    <!-- ENTRADAS -->
+    <section class="plate" aria-labelledby="t-in">
+      <h2 class="plate-title" id="t-in"><svg aria-hidden="true"><use href="#i-bolt"/></svg><span data-i18n="tIn">Input</span></h2>
+      <div class="plate-body">
+        <div class="field">
+          <div class="field-head">
+            <label for="amount" data-i18n-html="lAmount">Starting items<span class="hint">Base (Normal) quality</span></label>
+            <div class="readout"><input type="number" id="amount" inputmode="numeric" min="1" max="1000000000" step="1"></div>
+          </div>
+          <div class="chips" role="group" data-i18n-aria="ariaAmt" aria-label="Quick amounts" id="amtChips">
+            <button type="button" class="chip" data-v="100">100</button>
+            <button type="button" class="chip" data-v="1000">1,000</button>
+            <button type="button" class="chip" data-v="10000">10,000</button>
+            <button type="button" class="chip" data-v="100000">100,000</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-head">
+            <label for="chanceRange" data-i18n-html="lChance">Quality chance<span class="hint">Per recycled ingredient</span></label>
+            <div class="readout"><input type="number" id="chance" inputmode="decimal" min="0" max="100" step="0.1" data-i18n-aria="ariaChance" aria-label="Quality chance in percent, exact value"><span class="unit">%</span></div>
+          </div>
+          <input type="range" id="chanceRange" min="1" max="25" step="0.1" value="24.8">
+          <div class="scale"><span>1%</span><span>25%</span></div>
+          <div class="chips" role="group" data-i18n-aria="ariaPre" aria-label="Module presets" id="preChips">
+            <button type="button" class="chip" data-v="4" data-i18n-title="pre1" title="4× Quality module 1">4× Q1</button>
+            <button type="button" class="chip" data-v="8" data-i18n-title="pre2" title="4× Quality module 2">4× Q2</button>
+            <button type="button" class="chip" data-v="10" data-i18n-title="pre3" title="4× Quality module 3">4× Q3</button>
+            <button type="button" class="chip" data-v="24.8" data-i18n-title="pre4" title="4× legendary Quality module 3">4× Q3★</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-head"><span class="label" data-i18n="lMode">Loop strategy</span></div>
+          <div class="seg" role="group" data-i18n-aria="ariaMode" aria-label="Loop strategy">
+            <button type="button" data-mode="climb" aria-pressed="true" data-i18n="mClimb">Climb all tiers</button>
+            <button type="button" data-mode="normal" aria-pressed="false" data-i18n="mNormal">Normal only</button>
+          </div>
+          <p class="mode-note" id="modeNote"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- RESULTADOS -->
+    <section class="plate" aria-labelledby="t-out">
+      <h2 class="plate-title" id="t-out"><svg aria-hidden="true"><use href="#i-chart"/></svg><span data-i18n="tOut">Expected yield</span></h2>
+      <div class="plate-body">
+        <div class="tiers" id="tiers"></div>
+        <div class="stats">
+          <div class="stat"><span data-i18n="sProc">Recycler loads (items processed)</span><b id="sProc">0</b></div>
+          <div class="stat"><span data-i18n="sRatio">Recycler loads per starting item</span><b id="sRatio">0</b></div>
+        </div>
+
+        <details>
+          <summary data-i18n="dTitle">Exact values &amp; assumptions</summary>
+          <div class="detail-body">
+            <table aria-label="Exact values">
+              <thead><tr><th data-i18n="thTier">Tier</th><th data-i18n="thExact">Exact yield</th><th data-i18n="thPct">% of start</th></tr></thead>
+              <tbody id="exact"></tbody>
+            </table>
+            <div id="assump"></div>
+          </div>
+        </details>
+      </div>
+    </section>
+  </div>
+
+  <!-- KO-FI -->
+  <section class="plate support" aria-labelledby="t-kofi">
+    <div class="plate-body">
+      <svg class="cup" aria-hidden="true"><use href="#i-cup"/></svg>
+      <h2 id="t-kofi" data-i18n="kTitle">Fuel the factory</h2>
+      <p data-i18n="kText">Found this useful? Help me keep building free tools for engineers like you.</p>
+      <a class="kofi" href="https://ko-fi.com/titixmixgames" target="_blank" rel="noopener noreferrer">
+        <svg aria-hidden="true"><use href="#i-cup"/></svg><span data-i18n="kBtn">Buy me a coffee</span>
+      </a>
+    </div>
+  </section>
+
+  <p class="legal" data-i18n="legal">Fan-made tool. Not affiliated with Wube Software. Factorio is a trademark of Wube Software Ltd.</p>
+  <noscript><p>This calculator needs JavaScript. · Esta calculadora necesita JavaScript.</p></noscript>
+  <div class="sr" id="srOut" role="status" aria-live="polite"></div>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  /* =============== 1. MODELO (puro, sin DOM) ===============
+     - Cada ítem reciclado devuelve el 25 % de sus ingredientes (1 ítem → 0.25 ítems-equivalentes).
+     - Cada ingrediente devuelto tira calidad: sube 1 tier con prob. q; tras subir hay un 10 % de
+       subir otro tier más (encadenado). Legendary es el tope.
+     - El ingrediente se vuelve a fabricar con su calidad (la fabricación se modela neutra).
+     - Legendary no se recicla (es el producto final).
+     Todo se resuelve en forma cerrada: la matriz de transición es triangular superior, así que
+     la suma infinita de bucles es una serie geométrica 1 / (1 - M[k][k]). Sin simulación.        */
+  const RETURN = 0.25, SKIP = 0.10, TOP = 4;
+
+  function dist(q, from) {                       // prob. de acabar en cada tier tras la tirada
+    const d = [0, 0, 0, 0, 0], m = TOP - from;
+    d[from] = 1 - q;
+    for (let j = 1; j < m; j++) d[from + j] = q * (1 - SKIP) * Math.pow(SKIP, j - 1);
+    d[from + m] += q * Math.pow(SKIP, m - 1);    // lo que sobrepasa el tope cae en Legendary
+    return d;
+  }
+
+  function compute(N, q, mode) {
+    const M = [];
+    for (let i = 0; i < TOP; i++) M.push(dist(q, i).map((p) => RETURN * p));
+    const v = [0, 0, 0, 0, 0], a = [N, 0, 0, 0, 0];
+    if (mode === 'normal') {                     // solo se recicla Normal; lo mejorado se retira
+      v[0] = N / (1 - M[0][0]);
+      for (let k = 1; k <= TOP; k++) a[k] = v[0] * M[0][k];
+      return { a, processed: v[0] };
+    }
+    for (let k = 0; k < TOP; k++) {              // se recicla todo lo que está por debajo del tier
+      if (k > 0) { a[k] = 0; for (let i = 0; i < k; i++) a[k] += v[i] * M[i][k]; }
+      v[k] = a[k] / (1 - M[k][k]);
+    }
+    a[TOP] = 0;
+    for (let i = 0; i < TOP; i++) a[TOP] += v[i] * M[i][TOP];
+    return { a, processed: v.slice(0, TOP).reduce((x, y) => x + y, 0) };
+  }
+
+  /* =============== 2. TEXTOS (EN / ES) =============== */
+  const I18N = {
+    en: {
+      docTitle: 'Factorio Quality Loop Calculator – Space Age Recycler Yield',
+      eyebrow: 'Factorio: Space Age', title: 'Quality Loop Calculator', ariaLang: 'Language',
+      tIn: 'Input', tOut: 'Expected yield',
+      lAmount: 'Starting items<span class="hint">Base (Normal) quality</span>',
+      lChance: 'Quality chance<span class="hint">Per recycled ingredient</span>',
+      ariaChance: 'Quality chance in percent, exact value', ariaAmt: 'Quick amounts', ariaPre: 'Module presets',
+      pre1: '4× Quality module 1 (1% each)', pre2: '4× Quality module 2 (2% each)',
+      pre3: '4× Quality module 3 (2.5% each)', pre4: '4× legendary Quality module 3 (6.2% each)',
+      lMode: 'Loop strategy', ariaMode: 'Loop strategy', mClimb: 'Climb all tiers', mNormal: 'Normal only',
+      noteClimb: 'Everything below a tier keeps getting recycled. Each card is the exact-quality yield you collect if you stop at that tier (Legendary = the full loop).',
+      noteNormal: 'Only Normal items are recycled; anything upgraded is pulled out of the loop right away.',
+      tiers: ['Normal', 'Uncommon', 'Rare', 'Epic', 'Legendary'],
+      per100: '1 for every', per100r: 'items', best: 'of start',
+      sProc: 'Recycler loads (items processed)', sRatio: 'Recycler loads per starting item',
+      dTitle: 'Exact values & assumptions', thTier: 'Tier', thExact: 'Exact yield', thPct: '% of start',
+      assump: '<ul><li>The recycler returns <code>25%</code> of the ingredients of each item.</li><li>Every returned ingredient rolls quality: upgrade chance <code>q</code>, and after an upgrade there is a <code>10%</code> chance of one more tier, chained. Legendary is the cap.</li><li>Returned ingredients are re-crafted into items of the same quality (the crafting step is treated as quality-neutral).</li><li>Results are <b>expected values</b> (averages), computed in closed form for infinite loops, not simulated.</li><li>Items that skip above a tier are real items of the higher tier; each card assumes you stop at its own tier.</li><li>Legendary items are never recycled.</li></ul>',
+      kTitle: 'Fuel the factory', kText: 'Found this useful? Help me keep building free tools for engineers like you.', kBtn: 'Buy me a coffee',
+      legal: 'Fan-made tool. Not affiliated with Wube Software. Factorio is a trademark of Wube Software Ltd.'
+    },
+    es: {
+      docTitle: 'Calculadora de bucle de calidad de Factorio – Rendimiento del reciclador (Space Age)',
+      eyebrow: 'Factorio: Space Age', title: 'Calculadora de bucle de calidad', ariaLang: 'Idioma',
+      tIn: 'Entrada', tOut: 'Rendimiento esperado',
+      lAmount: 'Ítems iniciales<span class="hint">Calidad base (Normal)</span>',
+      lChance: 'Probabilidad de calidad<span class="hint">Por ingrediente reciclado</span>',
+      ariaChance: 'Probabilidad de calidad en porcentaje, valor exacto', ariaAmt: 'Cantidades rápidas', ariaPre: 'Presets de módulos',
+      pre1: '4× módulo de calidad 1 (1 % cada uno)', pre2: '4× módulo de calidad 2 (2 % cada uno)',
+      pre3: '4× módulo de calidad 3 (2,5 % cada uno)', pre4: '4× módulo de calidad 3 legendario (6,2 % cada uno)',
+      lMode: 'Estrategia del bucle', ariaMode: 'Estrategia del bucle', mClimb: 'Subir todos los tiers', mNormal: 'Solo Normal',
+      noteClimb: 'Todo lo que está por debajo de un tier se sigue reciclando. Cada tarjeta es el rendimiento de calidad exacta que recoges si te detienes en ese tier (Legendario = el bucle completo).',
+      noteNormal: 'Solo se recicla lo Normal; cualquier ítem mejorado se saca del bucle al instante.',
+      tiers: ['Normal', 'Poco común', 'Raro', 'Épico', 'Legendario'],
+      per100: '1 por cada', per100r: 'ítems', best: 'del inicio',
+      sProc: 'Cargas del reciclador (ítems procesados)', sRatio: 'Cargas del reciclador por ítem inicial',
+      dTitle: 'Valores exactos y supuestos', thTier: 'Tier', thExact: 'Rendimiento exacto', thPct: '% del inicio',
+      assump: '<ul><li>El reciclador devuelve el <code>25 %</code> de los ingredientes de cada ítem.</li><li>Cada ingrediente devuelto tira calidad: probabilidad de mejora <code>q</code>, y tras mejorar hay un <code>10 %</code> de subir un tier más, encadenado. Legendario es el tope.</li><li>Los ingredientes devueltos se vuelven a fabricar en ítems de la misma calidad (el paso de fabricación se trata como neutro en calidad).</li><li>Los resultados son <b>valores esperados</b> (medias), calculados en forma cerrada para bucles infinitos, no simulados.</li><li>Los ítems que saltan por encima de un tier son ítems reales del tier superior; cada tarjeta asume que te detienes en su propio tier.</li><li>Los ítems Legendarios nunca se reciclan.</li></ul>',
+      kTitle: 'Alimenta la fábrica', kText: '¿Te ha sido útil? Ayúdame a seguir creando herramientas gratuitas para ingenieros como tú.', kBtn: 'Invítame a un café',
+      legal: 'Herramienta de fans. Sin afiliación con Wube Software. Factorio es una marca de Wube Software Ltd.'
+    }
+  };
+  const has = (k) => Object.prototype.hasOwnProperty.call(I18N, k);
+  function detectLang() {
+    try { const q = new URLSearchParams(location.search).get('lang'); if (q && has(q)) return q; } catch (e) {}
+    try { const s = localStorage.getItem('qlc-lang'); if (s && has(s)) return s; } catch (e) {}
+    return (navigator.language || 'en').toLowerCase().startsWith('es') ? 'es' : 'en';
+  }
+
+  /* =============== 3. UTILIDADES =============== */
+  const $ = (id) => document.getElementById(id);
+  const reduced = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+  /** Convierte cualquier entrada en un número válido dentro de [min, max]. */
+  function sanitize(raw, min, max, fallback, decimals) {
+    const n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(',', '.'));
+    if (!Number.isFinite(n)) return fallback;
+    const f = Math.pow(10, decimals);
+    return Math.round(Math.min(max, Math.max(min, n)) * f) / f;
+  }
+
+  let lang = detectLang();
+  const T = () => I18N[lang];
+  const loc = () => (lang === 'es' ? 'es-ES' : 'en-US');
+  const state = { amount: 1000, chance: 24.8, mode: 'climb' };
+
+  /** Formato legible: más decimales cuando el valor es pequeño. */
+  function fmt(x, forceDec) {
+    if (!Number.isFinite(x)) return '—';
+    if (x === 0) return '0';
+    const dec = forceDec !== undefined ? forceDec : x >= 1000 ? 0 : x >= 100 ? 1 : x >= 1 ? 2 : x >= 0.01 ? 3 : 4;
+    if (forceDec === undefined && x < 0.0001) return '<0.0001';
+    return x.toLocaleString(loc(), { minimumFractionDigits: dec === 0 ? 0 : Math.min(dec, 2), maximumFractionDigits: dec });
+  }
+
+  /* =============== 4. DOM =============== */
+  const els = {
+    amount: $('amount'), chance: $('chance'), range: $('chanceRange'),
+    tiers: $('tiers'), sProc: $('sProc'), sRatio: $('sRatio'), exact: $('exact'),
+    assump: $('assump'), note: $('modeNote'), sr: $('srOut')
+  };
+  const cards = [];
+  (function buildCards() {
+    let h = '';
+    for (let k = 1; k <= TOP; k++) {
+      h += `<article class="tier${k === TOP ? ' legend' : ''}" data-q="${k}">
+        <div class="tier-row"><h3><span class="gem"></span><span class="tn"></span></h3><div class="big" id="big${k}">0</div></div>
+        <div class="sub"><span><span class="p100l"></span> <b id="p${k}">—</b> <span class="p100r"></span></span><span><b id="pc${k}">0%</b> <span class="of"></span></span></div>
+        <div class="bar"><i id="bar${k}"></i></div></article>`;
+    }
+    els.tiers.innerHTML = h;
+    for (let k = 1; k <= TOP; k++) cards[k] = { big: $('big' + k), p: $('p' + k), pc: $('pc' + k), bar: $('bar' + k) };
+  })();
+
+  /* Cuenta animada hacia el nuevo valor */
+  const raf = {}, shown = {};
+  function setNum(el, value, render) {
+    const key = el.id, from = key in shown ? shown[key] : 0;
+    shown[key] = value;
+    cancelAnimationFrame(raf[key]);
+    if (reduced || from === value) { el.textContent = render(value); return; }
+    const t0 = performance.now(), dur = 450;
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+      el.textContent = render(from + (value - from) * e);
+      if (p < 1) raf[key] = requestAnimationFrame(step); else el.textContent = render(value);
+    };
+    raf[key] = requestAnimationFrame(step);
+  }
+
+  /* =============== 5. RENDER =============== */
+  let srTimer;
+  function render() {
+    const tx = T(), N = state.amount, q = state.chance / 100;
+    const r = compute(N, q, state.mode);
+
+    const maxA = Math.max(r.a[1], r.a[2], r.a[3], r.a[4], 1e-12);
+    for (let k = 1; k <= TOP; k++) {
+      const c = cards[k], per100 = (r.a[k] / N) * 100;
+      setNum(c.big, r.a[k], (x) => fmt(x));
+      setNum(c.p, r.a[k] > 0 ? N / r.a[k] : 0, (x) => (x > 0 ? fmt(x, x >= 100 ? 0 : 1) : '—'));
+      c.pc.textContent = fmt(per100, per100 >= 1 ? 2 : 4) + '%';
+      c.bar.style.width = (r.a[k] > 0 ? Math.max(2, (r.a[k] / maxA) * 100) : 0) + '%';
+    }
+    setNum(els.sProc, r.processed, (x) => fmt(x));
+    setNum(els.sRatio, r.processed / N, (x) => fmt(x, 3));
+
+    // Tabla de valores exactos
+    let rows = '';
+    for (let k = 1; k <= TOP; k++) {
+      rows += `<tr><td style="color:var(--q${k})">${tx.tiers[k]}</td><td>${r.a[k].toLocaleString(loc(), { maximumFractionDigits: 6 })}</td><td>${((r.a[k] / N) * 100).toLocaleString(loc(), { maximumFractionDigits: 6 })}%</td></tr>`;
+    }
+    els.exact.innerHTML = rows;
+
+    // Texto accesible, con retardo para no saturar al lector de pantalla
+    clearTimeout(srTimer);
+    srTimer = setTimeout(() => {
+      els.sr.textContent = tx.tiers.slice(1).map((n, i) => `${n}: ${fmt(r.a[i + 1])}`).join('. ');
+    }, 600);
+  }
+
+  function applyLang() {
+    const tx = T();
+    document.documentElement.lang = lang;
+    document.title = tx.docTitle;
+    document.querySelectorAll('[data-i18n]').forEach((e) => { if (e.dataset.i18n in tx) e.textContent = tx[e.dataset.i18n]; });
+    document.querySelectorAll('[data-i18n-html]').forEach((e) => { e.innerHTML = tx[e.dataset.i18nHtml]; });
+    document.querySelectorAll('[data-i18n-aria]').forEach((e) => e.setAttribute('aria-label', tx[e.dataset.i18nAria]));
+    document.querySelectorAll('[data-i18n-title]').forEach((e) => { e.title = tx[e.dataset.i18nTitle]; });
+    document.querySelectorAll('.lang button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
+    document.querySelectorAll('#amtChips .chip').forEach((c) => { c.textContent = (+c.dataset.v).toLocaleString(loc()); });
+    document.querySelectorAll('.tier').forEach((el) => {
+      const k = +el.dataset.q;
+      el.querySelector('.tn').textContent = tx.tiers[k];
+      el.querySelector('.p100l').textContent = tx.per100;
+      el.querySelector('.p100r').textContent = tx.per100r;
+      el.querySelector('.of').textContent = tx.best;
+    });
+    els.assump.innerHTML = tx.assump;
+    els.note.textContent = state.mode === 'climb' ? tx.noteClimb : tx.noteNormal;
+    render();
+  }
+
+  function paintRange() {
+    const el = els.range, v = Math.min(+el.max, Math.max(+el.min, state.chance));
+    el.style.setProperty('--fill', ((v - el.min) / (el.max - el.min)) * 100 + '%');
+  }
+  function sync(skip) {
+    if (skip !== els.amount) els.amount.value = state.amount;
+    if (skip !== els.chance) els.chance.value = state.chance;
+    if (skip !== els.range) els.range.value = state.chance;
+    paintRange();
+    document.querySelectorAll('#amtChips .chip').forEach((c) => c.classList.toggle('on', +c.dataset.v === state.amount));
+    document.querySelectorAll('#preChips .chip').forEach((c) => c.classList.toggle('on', +c.dataset.v === state.chance));
+  }
+
+  /* =============== 6. EVENTOS =============== */
+  function setAmount(raw, src, commit) {
+    state.amount = Math.floor(sanitize(raw, 1, 1e9, state.amount, 0));
+    sync(commit ? null : src); render();
+  }
+  function setChance(raw, src, commit) {
+    state.chance = sanitize(raw, 0, 100, state.chance, 1);
+    sync(commit ? null : src); render();
+  }
+  els.amount.addEventListener('input', () => setAmount(els.amount.value, els.amount, false));
+  els.amount.addEventListener('change', () => setAmount(els.amount.value, els.amount, true));
+  els.amount.addEventListener('blur', () => setAmount(els.amount.value, els.amount, true));
+  els.chance.addEventListener('input', () => setChance(els.chance.value, els.chance, false));
+  els.chance.addEventListener('change', () => setChance(els.chance.value, els.chance, true));
+  els.chance.addEventListener('blur', () => setChance(els.chance.value, els.chance, true));
+  els.range.addEventListener('input', () => setChance(els.range.value, els.range, false));
+  [els.amount, els.chance].forEach((el) => el.addEventListener('keydown', (e) => {
+    if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+    if (el === els.amount && (e.key === '.' || e.key === ',')) e.preventDefault();
+  }));
+
+  document.querySelectorAll('#amtChips .chip').forEach((c) => c.addEventListener('click', () => setAmount(c.dataset.v, null, true)));
+  document.querySelectorAll('#preChips .chip').forEach((c) => c.addEventListener('click', () => setChance(c.dataset.v, null, true)));
+  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+    state.mode = b.dataset.mode;
+    document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    els.note.textContent = state.mode === 'climb' ? T().noteClimb : T().noteNormal;
+    render();
+  }));
+  document.querySelectorAll('.lang button').forEach((b) => b.addEventListener('click', () => {
+    lang = b.dataset.lang;
+    try { localStorage.setItem('qlc-lang', lang); } catch (e) {}
+    applyLang();
+  }));
+
+  /* =============== 7. INICIO =============== */
+  sync(null);
+  applyLang();
+})();
+</script>
+</body>
+</html>
